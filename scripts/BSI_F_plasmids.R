@@ -356,7 +356,8 @@ vags <- left_join(vags, custom_vags) %>% select(sort(names(.))) %>%
 
 # Total VAGs
 vags2 <- vags %>% 
-  mutate(`Total VAGs` = rowSums(across(where(is.integer)))) %>% 
+  mutate(`Total VAGs` = rowSums(across(where(is.integer))),
+         `F Plasmid Group` = factor(`F Plasmid Group`, levels = c("ColV", "senB", "Other", "None"))) %>% 
   select(all_of(meta_cols), `Total VAGs`)
 
 ####-----INTER-TYPE RSTS-----####
@@ -860,7 +861,7 @@ fig4a <- F_arg +
                      label.size = 3,
                      bracket.nudge.y = c(2, 4, 6, 8, 11)) +
   # scale_color_brewer(palette = "Dark2") +
-  scale_y_continuous(limits=c(0,40)) +
+  scale_y_continuous(limits=c(0,42)) +
   theme(legend.position = "none")
 
 #### FIGURE 4B ####
@@ -893,7 +894,8 @@ vags2 <- vags2 %>% mutate(FPType = `F Plasmid Group`)
 
 # Generate test statistics
 vag_plasmid_type <- vags2 %>% pairwise_wilcox_test(`Total VAGs` ~ FPType, p.adjust.method = "BH", detailed = TRUE)
-vag_plasmid_type <- vag_plasmid_type %>% add_xy_position(x = factor("F Plasmid Group")) #%>% mutate(xmin = case_when(group1 == "ColV" ~ 1,
+vag_plasmid_type <- vag_plasmid_type %>% add_xy_position(x = "F Plasmid Group") 
+#%>% mutate(xmin = case_when(group1 == "ColV" ~ 1,
 #                            group1 == "None" ~ 4,
 #                            group1 == "Other" ~ 3),
 #           xmax = case_when(group2 == "None" ~ 4,
@@ -910,7 +912,7 @@ fig4b <- F_vag +
                      label.size = 3,
                      bracket.nudge.y = c(9, 25, 40, 55, 70, 90))+
   # scale_color_brewer(palette = "Dark2") +
-  scale_y_continuous(limits=c(0,200)) +
+  scale_y_continuous(limits=c(0,240)) +
   theme(legend.position = "none")
 
 #### FIGURE 4C ####
