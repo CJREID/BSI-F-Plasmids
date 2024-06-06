@@ -8,8 +8,6 @@ library(ggpubr)
 library(RColorBrewer)
 library(abricateR)
 library(plasmidmapR)
-library(rstatix)
-library(ggforce)
 library(scales)
 
 ####-----SETUP-----####
@@ -594,7 +592,7 @@ F_plot <- ggplot(f_meta,
                                     fill = NA, 
                                     linewidth = .5)) +
   guides(color = guide_legend(nrow=1, byrow=TRUE, override.aes = list(size=1)))
-
+ 
 #### FIG 1C RST CLUSTER ####
 rst_plot <- ggplot(f_meta,
                    aes(x=tsne1D, 
