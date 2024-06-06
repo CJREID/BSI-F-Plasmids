@@ -69,6 +69,8 @@ mlst_ok <- mlst %>% mutate(ST = gsub("\\s.*", "", ST)) %>% filter(ST != "-",sche
 # Join to only include genomes of normal size with legitimate ST in the analysis
 meta <- mlst_ok %>% filter(name %in% assembly_ok$name) %>% select(Name = name, ST)
 
+rm(assembly_ok, mlst_ok, mlst)
+
 ####-----PROCESS ABRICATE DATA-----####
 #Load paths to files needed for abricateR
 abricate_path <- "data/full_summaries/genotype.txt"
@@ -91,12 +93,16 @@ abricateR::abricateR(
   pMLST_data = pMLST_data
 )
 
+rm(genotype,pointfinder,sepsis_co_occurence_N95L95, sepsis.colv_summary, sepsis.colv.N95.L95)
+
 ####-----PROCESS METADATA-----####
 # Select ColV data to add to meta
 colv <- sepsis_simple_summary_N95L95 %>% select(Name = name, ColV, IncF_RST)
 
 # Join plasmid meta and drop STs
 meta <- left_join(meta, colv)
+
+rm(colv)
 
 # Categorise ColV
 meta <- meta %>% mutate(ColV = case_when(ColV == "0" ~ "No", ColV == "1" ~ "Yes"))
@@ -158,6 +164,8 @@ senB_cjrABC <- sepsis.N95.L95.PASS %>%
   pivot_wider(id_cols = c(name, SEQUENCE), names_from = GENE, values_from = perc_identity) %>% 
   drop_na %>%
   select(-vfdb_senB)
+
+rm(sepsis.N95.L95.PASS, sepsis.N95.L95.FAIL)
 
 # Assign senB status
 senB_cjrABC <- senB_cjrABC %>% mutate(senB_cjrABC = rep("Yes", nrow(senB_cjrABC))) %>% select(name, senB_cjrABC)
@@ -229,6 +237,8 @@ pUTI89_ID$pUTI89_ID <- round((pUTI89_ID$pUTI89_ID/pUTI89_ref_length) * 100)
 # Add pUTI89 IDs to meta
 meta <- left_join(meta, pUTI89_ID) %>% mutate(pUTI89_ID = as.numeric(replace_na(pUTI89_ID, 0)))
 
+rm(pUTI89_binned_hits, pUTI89_ID)
+
 #
 ### pCERC4
 # Get tree path and abricate alignment data
@@ -261,7 +271,7 @@ pCERC4_ID$pCERC4_ID <- round((pCERC4_ID$pCERC4_ID/pCERC4_ref_length) * 100)
 
 # Add pCERC4 IDs to meta
 meta <- left_join(meta, pCERC4_ID) %>% mutate(pCERC4_ID = as.numeric(replace_na(pCERC4_ID, 0)))
-
+rm(pcerc4, pCERC4_binned_hits, pCERC4_ID)
 
 # Plot pUTI89 ID for sequences designated senB+
 puti89 <- meta %>% group_by(`Plasmid_Markers`)
@@ -278,8 +288,6 @@ ggplot(pcerc4 %>% filter(`Plasmid_Markers`=="ColV") %>%
          group_by(pCERC4_ID) %>% 
          summarise(count = n()), aes(x=pCERC4_ID, y = count)) +
   geom_col()
-
-
 
 ####-----MGE-CLUSTER METADATA-----####
 F_type_colours <- c("ColV" = "#17e6ae", "senB" = "#E7298A", "No Plasmid Markers" = "#dbdbdb", "No F Plasmid" = "#f0efe6")
@@ -309,6 +317,8 @@ mge_data <- mge_data %>%
 mge_meta <- left_join(meta, mge_data, by= c("Name"= "Sample_Name")) %>%
   select(Name, ST, ST_simple, tsne1D, tsne2D, Standard_Cluster, Standard_Cluster_simple, IncF_simple, IncF_RST, `Plasmid_Markers`)
 
+rm(mge_data)
+
 mge_vars <- mge_meta %>% filter(!is.na(Standard_Cluster)) %>% pull(Standard_Cluster) %>% unique()
 mge_clrs <- colorRampPalette(brewer.pal(12, "Set3"))(length(mge_vars))
 names(mge_clrs) <- sort(mge_vars)
@@ -330,28 +340,6 @@ simp_mge_clrs2["None"] <- "#faf9f0"
 meta <- left_join(meta, mge_meta %>% select(Name, Standard_Cluster, Standard_Cluster_simple)) %>% 
   mutate(Standard_Cluster_simple = replace_na(Standard_Cluster_simple, "None")) %>% 
   mutate(Standard_Cluster_simple = factor(Standard_Cluster_simple, levels = names(simp_mge_clrs2)))
-
-####-----INTER-TYPE RSTS-----####
-# have a look at RSTs that are present in different Plasmid_Markerss
-type_incf <- meta %>% group_by(Name, `Plasmid_Markers`, IncF_RST) %>% summarise() %>% pivot_wider(names_from = `Plasmid_Markers`, values_from = IncF_RST)
-
-colv_incs <- type_incf$ColV %>% na.omit() %>% unique()
-senb_incs <- type_incf$`senB` %>% na.omit() %>% unique()
-other_incs <- type_incf$`Other` %>% na.omit() %>% unique()
-
-a <- intersect(colv_incs, senb_incs)
-
-b <- intersect(senb_incs, other_incs)
-
-c <- intersect(colv_incs, other_incs)
-
-y <- intersect(b,c)
-intersect(y,a)
-
-x <- union(a,c)
-union(x, b)
-
-unique(meta$IncF_RST) %>% length()
 
 ####------COLOURS-----####
 # Common STs
@@ -408,54 +396,7 @@ puti89_clrs <- c("pUTI89-Pos" = "#E7298A", "pUTI89-Neg" = 'white')
 # senB
 senB_clrs <- c("senB" = "#26e9ff", "senB-Neg" = 'white')
 
-# Combine for tree
-tree_vars <- c(ST_clrs, F_type_colours, F_clrs)
 
-# Select phylogroup data for tips
-phylo_tips <- meta %>% select(Name, phylogroup)
-
-####-----MOBSUITE DATA-----####
-pmob <- read_csv('data/mobsuite/plasmid_concatenated_contig_report.csv')
-
-pmob <- pmob %>% 
-  filter(molecule_type == "plasmid") %>% 
-  select("Name", "primary_cluster_id", "secondary_cluster_id", "rep_type" = "rep_type(s)", "relaxase_type" = "relaxase_type(s)", "mpf_type", "orit_type" = "orit_type(s)")
-
-pmob_filt <- pmob %>%
-  group_by(Name, primary_cluster_id) %>%
-  summarize_all(~paste(unique(na.omit(.)), collapse = ',')) %>% 
-  ungroup() %>% 
-  filter(grepl("IncF", rep_type), grepl("MOBF", relaxase_type), grepl("MOBF", orit_type))
-
-pmob_filt_no_orit <-pmob %>%
-  group_by(Name, primary_cluster_id) %>%
-  summarize_all(~paste(unique(na.omit(.)), collapse = ',')) %>% 
-  ungroup() %>% 
-  filter(grepl("IncF", rep_type), grepl("MOBF", relaxase_type))
-
-pmob_meta <- left_join(meta %>% select(Name, IncF_RST), pmob_filt)
-
-# Get the top 15 primary clusters
-top15_pclust <- pmob_filt %>% 
-  group_by(primary_cluster_id) %>% 
-  tally %>% 
-  arrange(desc(n)) %>% 
-  slice(1:15) %>% 
-  pull(primary_cluster_id)
-
-# Top 15 secondary clusters
-top15_sclust <- pmob_filt %>% 
-  group_by(secondary_cluster_id) %>% 
-  tally %>% 
-  arrange(desc(n)) %>% 
-  slice(1:15) %>% 
-  pull(secondary_cluster_id)
-
-pmob_filt <- pmob_filt %>% 
-  mutate(primary_cluster_id = ifelse(is.na(primary_cluster_id), "None", as.character(primary_cluster_id)),
-         secondary_cluster_id = ifelse(is.na(secondary_cluster_id), "None", as.character(secondary_cluster_id)),
-         primary_cluster_simple = ifelse(primary_cluster_id %in% top15_pclust, as.character(primary_cluster_id), "Other"),
-         secondary_cluster_simple = ifelse(secondary_cluster_id %in% top15_sclust, as.character(secondary_cluster_id), "Other"))
 
 ####------GENE PROCESSING-----####
 # Create 'geno_meta' df with all meta and gene screening data
@@ -555,7 +496,7 @@ HPI <- vags %>% mutate(HPI = case_when(fyuA == "1" & irp2 == "1" ~ "1", TRUE ~ "
 
 # Add HPI to meta
 meta <- left_join(meta, HPI)
-
+rm(HPI)
 #####################################
 ####---- FIGURE 1 MGE CLUSTER ----####
 #####################################
@@ -1197,6 +1138,7 @@ figS4 <- ggplot(f2_meta, aes(x = Plasmid_Markers)) +
       angle = 30
     ),
     axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
     axis.line = element_blank(),
     legend.position = "bottom",
     legend.key.size = unit(5.5, "mm"),
@@ -1221,6 +1163,8 @@ ggsave("figS4.commonSTs.markers.RSTs.pdf",
        width = 270,
        height = 180,
        unit ="mm")
+
+rm(list=ls(pattern="fig"))
 
 #####################################
 ####     SUPP AND SOURCE DATA    ####
@@ -1272,4 +1216,4 @@ plsdb_data <- left_join(pls_acc, pls_meta, by = c("Accession"="NUCCORE_ACC"))
 # Save as SuppData2
 write_csv(plsdb_data, "outputs/data/SupplementaryData2.csv")      
 
-rm(pls_acc, pls_meta, plsdb_data)
+rm(pls_acc, pls_meta, plsdb_data, puti89, phylogroup, accessions)
